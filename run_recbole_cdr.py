@@ -1,6 +1,4 @@
-# @Time   : 2022/3/11
-# @Author : Zihan Lin
-# @Email  : zhlin@ruc.edu.cn
+
 
 import torch
 # torch.use_deterministic_algorithms(True)

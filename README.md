@@ -1,6 +1,8 @@
 
 # Implement of kdd2023 submission titled MF-GSLAE: A Multi-Factor User Representation Learning Framework for Dual-Target Cross-Domain Recommendation 
 
+Our model file is in `recbole_cdr/model/cross_domain_recommender/mfgslae.py`
+
 ## Requirements
 
 ```
