@@ -1,0 +1,12 @@
+dropout_prob: 0.7
+tau: 0.5
+factor: 4
+epsilon: 5
+alpha: 0.1
+ratio: 0.99
+ratio_threshold: 0.5
+l1_rate: 1e-06
+learning_rate: 0.001
+weight_decay: 0.01
+latent_dimension: 64
+use_user_loader: true

@@ -1,0 +1,21 @@
+# Saved models
+/saved*
+*.pth
+mydataset/*
+general_yaml
+docs/
+.vscode/
+dataset/
+tuning/
+config/
+pretrain/
+fig/
+.idea/
+*.pyc
+*.log
+log_tensorboard/*
+saved/
+*.lprof
+*.egg-info/
+docs/build/
+wandb/*
