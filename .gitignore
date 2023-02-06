@@ -5,9 +5,7 @@ mydataset/*
 general_yaml
 docs/
 .vscode/
-dataset/
 tuning/
-config/
 pretrain/
 fig/
 .idea/
