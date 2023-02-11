@@ -63,8 +63,6 @@ class KernelAttention(nn.Module):
         self.num_factor = num_factor
         self.nb_random_features = nb_random_features
         self.weight = weight
-        self.training_seed = None
-        self.old_seed = 0
 
     def reset_parameters(self):
         self.apply(xavier_normal_initialization)
