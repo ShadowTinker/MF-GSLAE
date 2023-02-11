@@ -48,7 +48,7 @@ class KernelAttention(nn.Module):
     return: node embeddings for next layer, edge loss at this layer
     '''
     def __init__(self, in_channels, out_channels, num_factor,
-                    nb_random_features=10, nb_gumbel_sample=10, weight=True):
+                    nb_random_features=10, weight=True):
         super(KernelAttention, self).__init__()
         if weight:
             self.Wk = nn.ModuleList()
@@ -62,7 +62,6 @@ class KernelAttention(nn.Module):
         self.out_channels = out_channels
         self.num_factor = num_factor
         self.nb_random_features = nb_random_features
-        self.nb_gumbel_sample = nb_gumbel_sample
         self.weight = weight
         self.training_seed = None
         self.old_seed = 0

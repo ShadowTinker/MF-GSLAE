@@ -53,8 +53,7 @@ class MFGSLAE(CrossDomainRecommender, AutoEncoderMixin):
             self.hidden_dim,
             self.hidden_dim,
             self.factor,
-            nb_random_features=64,
-            nb_gumbel_sample=10
+            nb_random_features=64
         )
         self.subspace_projector = nn.ModuleList()
         for idx in range(self.factor):
