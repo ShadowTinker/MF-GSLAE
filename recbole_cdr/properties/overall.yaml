@@ -5,7 +5,7 @@ seed: 2022
 state: INFO
 reproducibility: True
 data_path: 'dataset/'
-checkpoint_dir: '/data/mjyin/recbole-cdr-ckpt'
+checkpoint_dir: 'recbole-cdr-ckpt'
 show_progress: True
 save_dataset: False
 dataset_save_path: ~

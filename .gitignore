@@ -17,3 +17,4 @@ saved/
 *.egg-info/
 docs/build/
 wandb/*
+recbole-cdr-ckpt/*
