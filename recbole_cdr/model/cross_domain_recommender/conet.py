@@ -1,18 +1,4 @@
-# -*- coding: utf-8 -*-
-# @Time   : 2022/3/30
-# @Author : Gaowei Zhang
-# @Email  : 1462034631@qq.com
-# UPDATE
-# @Time    :   2022/4/11
-# @Author  :   Zihan Lin
-# @email   :   zhlin@ruc.edu.cn
 
-r"""
-CoNet
-################################################
-Reference:
-    Guangneng Hu et al. "CoNet: Collaborative Cross Networks for Cross-Domain Recommendation." in CIKM 2018.
-"""
 
 import torch
 import torch.nn as nn

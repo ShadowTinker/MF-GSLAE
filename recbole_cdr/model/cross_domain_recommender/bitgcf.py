@@ -1,14 +1,4 @@
-# -*- coding: utf-8 -*-
-# @Time   : 2022/3/23
-# @Author : Gaowei Zhang
-# @Email  : 1462034631@qq.com
 
-r"""
-BiTGCF
-################################################
-Reference:
-    Meng Liu et al. "Cross Domain Recommendation via Bi-directional Transfer Graph Collaborative Filtering Networks." in CIKM 2020.
-"""
 
 import numpy as np
 import scipy.sparse as sp

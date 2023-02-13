@@ -1,14 +1,4 @@
-# -*- coding: utf-8 -*-
-# @Time   : 2022/3/22
-# @Author : Zihan Lin
-# @Email  : zhlin@ruc.edu.cn
 
-r"""
-DTCDR
-################################################
-Reference:
-    Feng Zhu et al. "DTCDR: A Framework for Dual-Target Cross-Domain Recommendation." in CIKM 2019.
-"""
 import numpy as np
 import torch
 import torch.nn as nn
