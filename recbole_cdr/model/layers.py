@@ -43,10 +43,6 @@ def softmax_kernel(data, is_query, projection_matrix, eps=1e-4):
     return data_dash
 
 class KernelAttention(nn.Module):
-    '''
-    one layer of NodeFormer that attentive aggregates all nodes over a latent graph
-    return: node embeddings for next layer, edge loss at this layer
-    '''
     def __init__(self, in_channels, out_channels, num_factor,
                     nb_random_features=10, weight=True):
         super(KernelAttention, self).__init__()
