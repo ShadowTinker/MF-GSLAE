@@ -1,7 +1,7 @@
 # general
 gpu_id: 0
 use_gpu: True
-seed: 2022
+seed: 2023
 state: INFO
 reproducibility: True
 data_path: 'dataset/'
@@ -37,9 +37,9 @@ eval_args:
   order: RO
   mode: full
 repeatable: False
-metrics: ["Recall","MRR","NDCG","Hit","Precision"]
+metrics: ["Recall", "NDCG"]
 topk: [20]
-valid_metric: NDCG@20
+valid_metric: Recall@20
 valid_metric_bigger: True
 eval_batch_size: 409600
 metric_decimal_place: 4

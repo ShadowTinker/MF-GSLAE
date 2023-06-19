@@ -4,6 +4,7 @@
 recbole_cdr.quick_start
 ########################
 """
+import nni
 import logging
 from logging import getLogger
 import torch
@@ -15,7 +16,7 @@ from recbole_cdr.data import create_dataset, data_preparation
 from recbole_cdr.utils import get_model, get_trainer
 
 
-def run_recbole_cdr(model=None, config_file_list=None, config_dict=None, saved=True):
+def run_recbole_cdr(model=None, config_file_list=None, config_dict=None, saved=True, nni_para=None):
     r""" A fast running api, which includes the complete process of
     training and testing a model on a specified dataset
 
@@ -27,6 +28,8 @@ def run_recbole_cdr(model=None, config_file_list=None, config_dict=None, saved=T
     """
     # configurations initialization
     config = CDRConfig(model=model, config_file_list=config_file_list, config_dict=config_dict)
+    if nni_para != None:
+        config.final_config_dict.update(nni_para)
     import os
     # os.environ['PYTHONHASHSEED'] = str(config['seed'])
     init_seed(config['seed'], config['reproducibility'])

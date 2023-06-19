@@ -13,11 +13,11 @@ from torch.distributions.binomial import Binomial
 
 from recbole_cdr.model.layers import KernelAttention, Binarize
 
-class MFGSLAE(CrossDomainRecommender, AutoEncoderMixin):
+class MFGSLAE2(CrossDomainRecommender, AutoEncoderMixin):
     input_type = InputType.PAIRWISE
 
     def __init__(self, config, dataset):
-        super(MFGSLAE, self).__init__(config, dataset)
+        super(MFGSLAE2, self).__init__(config, dataset)
 
         # load dataset info
         self.SOURCE_LABEL = dataset.source_domain_dataset.label_field
@@ -31,7 +31,6 @@ class MFGSLAE(CrossDomainRecommender, AutoEncoderMixin):
         self.lat_dim = config["latent_dimension"]
         self.drop_out = config["dropout_prob"]
         self.tau = config['tau']
-        self.tau_dec = config['tau_dec']
         self.factor = config['factor']
         self.epsilon = config['epsilon']
         self.alpha = config['alpha']
@@ -45,9 +44,9 @@ class MFGSLAE(CrossDomainRecommender, AutoEncoderMixin):
         self.ratio_threshold = config['ratio_threshold']
 
         # define layers and loss
-        self.hidden_dim = self.lat_dim
-        self.source_encoder = nn.Linear(self.total_num_items, self.hidden_dim)
-        self.target_encoder = nn.Linear(self.total_num_items, self.hidden_dim)
+        self.hidden_dim = self.lat_dim * self.factor
+        self.source_encoder = nn.Linear(self.total_num_items, self.lat_dim)
+        self.target_encoder = nn.Linear(self.total_num_items, self.lat_dim)
         self.gsl_encoder = nn.Linear(self.total_num_items, self.hidden_dim)
         self.act = nn.LeakyReLU()
         self.graph_layer = KernelAttention(
@@ -67,10 +66,10 @@ class MFGSLAE(CrossDomainRecommender, AutoEncoderMixin):
         self.norm = nn.ModuleList()
         self.norm.append(nn.LayerNorm(self.hidden_dim))
         self.norm.append(nn.LayerNorm(self.hidden_dim))
-        self.source_aug_norm = nn.LayerNorm(self.hidden_dim)
-        self.target_aug_norm = nn.LayerNorm(self.hidden_dim)
-        self.proj_source = nn.Linear(self.lat_dim, self.lat_dim, bias=False)
-        self.proj_target = nn.Linear(self.lat_dim, self.lat_dim, bias=False)
+        self.source_aug_norm = nn.LayerNorm(self.lat_dim)
+        self.target_aug_norm = nn.LayerNorm(self.lat_dim)
+        self.proj_source = nn.Linear(self.hidden_dim, self.hidden_dim, bias=False)
+        self.proj_target = nn.Linear(self.hidden_dim, self.hidden_dim, bias=False)
         self.mask_source = nn.Parameter(torch.empty(1, self.factor))
         self.mask_target = nn.Parameter(torch.empty(1, self.factor))
         self.decoder_source = nn.Linear(self.lat_dim, self.source_num_items)
@@ -143,8 +142,10 @@ class MFGSLAE(CrossDomainRecommender, AutoEncoderMixin):
         h_target = self.proj_target(h).reshape(h.shape[0], self.factor, -1)
         mask_source = self.binary(self.mask_source).unsqueeze(-1)
         mask_target = self.binary(self.mask_target).unsqueeze(-1)
-        h_source_aug = self.source_aug_norm((h_source * mask_source).flatten(-2, -1))
-        h_target_aug = self.target_aug_norm((h_target * mask_target).flatten(-2, -1))
+        # h_source_aug = self.source_aug_norm((h_source * mask_source).flatten(-2, -1))
+        # h_target_aug = self.target_aug_norm((h_target * mask_target).flatten(-2, -1))
+        h_source_aug = self.source_aug_norm((h_source * mask_source).sum(1))
+        h_target_aug = self.target_aug_norm((h_target * mask_target).sum(1))
         return h_source_aug, h_target_aug
 
     def forward(self, source_user=[], target_user=[]):
@@ -152,20 +153,17 @@ class MFGSLAE(CrossDomainRecommender, AutoEncoderMixin):
         input = self.sprase_drop(self.sparse_norm_rating_source)
         h = torch.sparse.mm(input, self.source_encoder.weight.T) + self.source_encoder.bias
         h_source = self.act(h)
-        h_source = F.normalize(h_source, dim=-1)
 
         # Target bootstrapping channel
         input = self.sprase_drop(self.sparse_norm_rating_target)
         h = torch.sparse.mm(input, self.target_encoder.weight.T) + self.target_encoder.bias
         h_target = self.act(h)
-        h_target = F.normalize(h_target, dim=-1)
 
         # GSL augmentation channel
         input = self.sprase_drop(self.sparse_norm_rating_matrix)
         h = torch.sparse.mm(input, self.gsl_encoder.weight.T) + self.gsl_encoder.bias
         res = h[0:1] # User in position 1 is meaningless
         h_gsl = self.act(h[1:])
-        h_gsl = F.normalize(h_gsl, dim=-1)
         h_gsl = self.factor_gsl(h_gsl)
         h_gsl = torch.cat([res, h_gsl])
         self.h_gsl = h_gsl.reshape(h_gsl.shape[0], self.factor, -1)
@@ -178,8 +176,8 @@ class MFGSLAE(CrossDomainRecommender, AutoEncoderMixin):
         h_target = self.ratio * h_target + (1 - self.ratio) * h_target_aug
 
         # Decoder
-        reconstructed_source = h_source[source_user] @ self.decoder_source.weight.T / self.tau_dec
-        reconstructed_target = h_target[target_user] @ self.decoder_target.weight.T / self.tau_dec
+        reconstructed_source = h_source[source_user] @ self.decoder_source.weight.T + self.decoder_source.bias
+        reconstructed_target = h_target[target_user] @ self.decoder_target.weight.T + self.decoder_target.bias
 
         # return reconstructed
         return reconstructed_source, reconstructed_target

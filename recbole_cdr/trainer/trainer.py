@@ -4,6 +4,7 @@ r"""
 recbole_cdr.trainer.trainer
 ################################
 """
+import nni
 import torch
 import numpy as np
 from time import time
@@ -106,6 +107,22 @@ class CrossDomainTrainer(Trainer):
                         self.model.set_full_sort_func('Source')
                         self.model.set_predict_func('Source')
                         valid_score_source, valid_result_source = self._valid_epoch(valid_data[0], show_progress=show_progress)
+
+                        if self.config["nni"]:
+                            nni_result_source = {}
+                            for k, v in valid_result_source.items():
+                                nni_result_source[k + '_source'] = v
+
+                            nni_result_target = {}
+                            for k, v in valid_result_target.items():
+                                nni_result_target[k + '_target'] = v
+
+                            nni_result = {}
+                            nni_result["default"] = list(nni_result_source.values())[0] + list(nni_result_target.values())[0]
+                            nni_result.update(nni_result_source)
+                            nni_result.update(nni_result_target)
+                            nni.report_intermediate_result(nni_result)
+
                         # All, addition by default
                         valid_score = valid_score_source + valid_score_target
                         valid_result = OrderedDict({key: value + valid_result_source[key] for key, value in valid_result_target.items()})

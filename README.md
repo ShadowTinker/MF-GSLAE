@@ -80,3 +80,11 @@ python run_recbole_cdr.py --model=MFGSLAE --config_files=./config/ama-elecmov.ya
 ```
 
 
+epinions
+0.3, 0.2
+
+douban
+0.1, 0.1
+
+amazon
+0.1, 0.1

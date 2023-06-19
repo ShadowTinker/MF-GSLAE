@@ -1,4 +1,7 @@
-
+# -*- coding: utf-8 -*-
+# @Time   : 2022/3/23
+# @Author : Gaowei Zhang
+# @Email  : 1462034631@qq.com
 
 import numpy as np
 import scipy.sparse as sp
@@ -14,7 +17,7 @@ from recbole.model.layers import MLPLayers
 from recbole.utils import InputType
 
 
-class MultiVAE(CrossDomainRecommender, AutoEncoderMixin):
+class MacridVAE(CrossDomainRecommender, AutoEncoderMixin):
     r"""BiTGCF uses feature propagation and feature transfer to achieve bidirectional
         knowledge transfer between the two domains.
         We extend the basic BiTGCF model in a symmetrical way to support those datasets that have overlapped items.
@@ -23,7 +26,7 @@ class MultiVAE(CrossDomainRecommender, AutoEncoderMixin):
     input_type = InputType.PAIRWISE
 
     def __init__(self, config, dataset):
-        super(MultiVAE, self).__init__(config, dataset)
+        super(MacridVAE, self).__init__(config, dataset)
 
         # load dataset info
         self.SOURCE_LABEL = dataset.source_domain_dataset.label_field
@@ -42,15 +45,22 @@ class MultiVAE(CrossDomainRecommender, AutoEncoderMixin):
         self.anneal_cap = config["anneal_cap"]
         self.total_anneal_steps = config["total_anneal_steps"]
 
+
+        self.kfac = config["kfac"]
+        self.tau = config["tau"]
+        self.nogb = config["nogb"]
+        self.regs = config["reg_weights"]
+        self.std = config["std"]
+
         # define layers and loss
         self.update = 0
-        self.encode_layer_dims = [self.total_num_items] + self.layers + [self.lat_dim]
-        self.decode_layer_dims = [int(self.lat_dim / 2)] + self.encode_layer_dims[::-1][
-            1:
-        ]
+
+        self.encode_layer_dims = [self.total_num_items] + self.layers + [self.lat_dim * 2]
         
         self.encoder = MLPLayers(self.encode_layer_dims, activation="tanh")
-        self.decoder = self.mlp_layers(self.decode_layer_dims)
+        self.item_embedding = nn.Embedding(self.total_num_items, self.lat_dim)
+        self.k_embedding = nn.Embedding(self.kfac, self.lat_dim)
+        self.l2_loss = EmbLoss()
 
         # parameters initialization
         self.apply(xavier_normal_initialization)
@@ -66,27 +76,54 @@ class MultiVAE(CrossDomainRecommender, AutoEncoderMixin):
     def reparameterize(self, mu, logvar):
         if self.training:
             std = torch.exp(0.5 * logvar)
-            epsilon = torch.zeros_like(std).normal_(mean=0, std=0.01)
+            epsilon = torch.zeros_like(std).normal_(mean=0, std=self.std)
             return mu + epsilon * std
         else:
             return mu
 
     def forward(self, rating_matrix):
+        cores = F.normalize(self.k_embedding.weight, dim=1)
+        items = F.normalize(self.item_embedding.weight, dim=1)
 
-        h = F.normalize(rating_matrix)
+        rating_matrix = F.normalize(rating_matrix)
+        rating_matrix = F.dropout(rating_matrix, self.drop_out, training=self.training)
 
-        h = F.dropout(h, self.drop_out, training=self.training)
+        cates_logits = torch.matmul(items, cores.transpose(0, 1)) / self.tau
 
-        h = self.encoder(h)
+        if self.nogb:
+            cates = torch.softmax(cates_logits, dim=-1)
+        else:
+            cates_sample = F.gumbel_softmax(cates_logits, tau=1, hard=False, dim=-1)
+            cates_mode = torch.softmax(cates_logits, dim=-1)
+            cates = self.training * cates_sample + (1 - self.training) * cates_mode
 
-        mu = h[:, : int(self.lat_dim / 2)]
-        mu = F.normalize(mu)
-        logvar = h[:, int(self.lat_dim / 2) :]
+        probs = None
+        mulist = []
+        logvarlist = []
+        for k in range(self.kfac):
+            cates_k = cates[:, k].reshape(1, -1)
+            # encoder
+            x_k = rating_matrix * cates_k
+            h = self.encoder(x_k)
+            mu = h[:, : self.lat_dim]
+            mu = F.normalize(mu, dim=1)
+            logvar = h[:, self.lat_dim :]
 
-        z = self.reparameterize(mu, logvar)
-        z = F.normalize(z)
-        z = self.decoder(z)
-        return z, mu, logvar
+            mulist.append(mu)
+            logvarlist.append(logvar)
+
+            z = self.reparameterize(mu, logvar)
+
+            # decoder
+            z_k = F.normalize(z, dim=1)
+            logits_k = torch.matmul(z_k, items.transpose(0, 1)) / self.tau
+            probs_k = torch.exp(logits_k)
+            probs_k = probs_k * cates_k
+            probs = probs_k if (probs is None) else (probs + probs_k)
+
+        logits = torch.log(probs)
+
+        return logits, mulist, logvarlist
 
     def process_source_user_id(self, id):
         id[id >= self.overlapped_num_users] += self.target_num_users - self.overlapped_num_users
@@ -107,16 +144,34 @@ class MultiVAE(CrossDomainRecommender, AutoEncoderMixin):
         z, mu, logvar = self.forward(rating_matrix)
 
         # KL loss
-        kl_loss = (
-            -0.5
-            * torch.mean(torch.sum(1 + logvar - mu.pow(2) - logvar.exp(), dim=1))
-            * anneal
-        )
+        kl_loss = None
+        for i in range(self.kfac):
+            kl_ = -0.5 * torch.mean(torch.sum(1 + logvar[i] - logvar[i].exp(), dim=1))
+            kl_loss = kl_ if (kl_loss is None) else (kl_loss + kl_)
+
 
         # CE loss
         ce_loss = -(F.log_softmax(z, 1) * rating_matrix).sum(1).mean()
         
-        return (ce_loss, kl_loss)
+        if self.regs[0] != 0 or self.regs[1] != 0:
+            return ce_loss + kl_loss * anneal + self.reg_loss()
+        return (ce_loss, kl_loss * anneal)
+    
+    def reg_loss(self):
+        r"""Calculate the L2 normalization loss of model parameters.
+        Including embedding matrices and weight matrices of model.
+
+        Returns:
+            loss(torch.FloatTensor): The L2 Loss tensor. shape of [1,]
+        """
+        reg_1, reg_2 = self.regs[:2]
+        loss_1 = reg_1 * self.item_embedding.weight.norm(2)
+        loss_2 = reg_1 * self.k_embedding.weight.norm(2)
+        loss_3 = 0
+        for name, parm in self.encoder.named_parameters():
+            if name.endswith("weight"):
+                loss_3 = loss_3 + reg_2 * parm.norm(2)
+        return loss_1 + loss_2 + loss_3
 
     def full_sort_predict_source(self, interaction):
         user = interaction[self.SOURCE_USER_ID]

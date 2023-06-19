@@ -15,8 +15,11 @@ BIG_CONSTANT = 1e8
 class Binarize(torch.autograd.Function):
     @staticmethod
     def forward(ctx, real_value_mask):
-        binarized_mask = (real_value_mask >= 0).float().requires_grad_(True)
-        ctx.save_for_backward(binarized_mask.clone())
+        # binarized_mask = (real_value_mask >= 0).float().requires_grad_(True)
+        
+        binarized_mask = (real_value_mask >= 0).float()
+        binarized_mask[binarized_mask == 0] = -1.0
+        binarized_mask = binarized_mask.requires_grad_(True)
         return binarized_mask
 
     @staticmethod

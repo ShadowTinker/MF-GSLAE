@@ -1,6 +1,5 @@
 dropout_prob: 0.7
 tau: 0.5
-tau_dec: 0.2
 factor: 4
 epsilon: 5
 alpha: 0.1
