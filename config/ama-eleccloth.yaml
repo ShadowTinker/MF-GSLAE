@@ -1,0 +1,38 @@
+seed: 2022
+field_separator: "\t"
+source_domain:
+  dataset: ama-eleccloth
+  USER_ID_FIELD: user_id
+  ITEM_ID_FIELD: item_id
+  RATING_FIELD: rating
+  TIME_FIELD: timestamp
+  NEG_PREFIX: neg_
+  LABEL_FIELD: label
+  load_col:
+    inter: [user_id, item_id, rating]
+  user_inter_num_interval: "[0,inf)"
+  item_inter_num_interval: "[0,inf)"
+  val_interval:
+    rating: "[0,inf)"
+  drop_filter_field: True
+
+target_domain:
+  dataset: ama-clothelec
+  USER_ID_FIELD: user_id
+  ITEM_ID_FIELD: item_id
+  RATING_FIELD: rating
+  TIME_FIELD: timestamp
+  NEG_PREFIX: neg_
+  LABEL_FIELD: label
+  load_col:
+    inter: [user_id, item_id, rating]
+  user_inter_num_interval: "[0,inf)"
+  item_inter_num_interval: "[0,inf)"
+  val_interval:
+    rating: "[0,inf)"
+  drop_filter_field: True
+
+epochs: 500
+train_batch_size: 512
+eval_batch_size: 40960000
+valid_metric: NDCG@20

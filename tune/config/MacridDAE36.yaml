@@ -1,0 +1,39 @@
+experimentName: MacridDAE36_bootstrap_douban
+searchSpaceFile: ../search_space/MacridDAE36.json
+
+# trialCommand: python3 nni_tune.py --model MacridDAE36 --nni --config_files=./config/epinions.yaml
+trialCommand: python3 nni_tune.py --model MacridDAE36 --nni --config_files=./config/douban_bmovie.yaml
+# trialCommand: python3 nni_tune.py --model MacridDAE36 --nni --config_files=./config/ama-elecmov.yaml
+trialCodeDirectory: ../..
+trialGpuNumber: 1
+
+trialConcurrency: 4            # Run 4 trials concurrently.
+maxTrialNumber: 1000              # Generate at most 10 trials.
+maxExperimentDuration: 100d       # Stop generating trials after 1 hour.
+
+tuner:                          # Configure the tuning algorithm.
+  name: TPE
+  classArgs:
+    optimize_mode: maximize
+
+# assessor:
+#   name: Curvefitting
+#   classArgs:
+#     epoch_num: 200
+#     start_step: 20
+#     threshold: 0.9
+#     gap: 1
+
+# assessor:
+#   name: Medianstop
+#   classArgs:
+#     optimize_mode: maximize
+#     start_step: 200
+# Configure the training platform.
+# Supported platforms: local, remote, openpai, aml, kubeflow, kubernetes, adl.
+
+trainingService:
+  platform: local
+  useActiveGpu: true
+  gpuIndices: 0,1
+  maxTrialNumberPerGpu: 2

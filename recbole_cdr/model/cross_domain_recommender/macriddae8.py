@@ -22,50 +22,6 @@ from torch.distributions.binomial import Binomial
 import torch
 from torch import nn
 
-class FeedForward(nn.Module):
-    def __init__(self, dim, hidden_dim, dropout = 0.):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(dim, hidden_dim),
-            nn.GELU(),
-            nn.Dropout(dropout),
-            nn.Linear(hidden_dim, dim),
-            nn.Dropout(dropout)
-        )
-    def forward(self, x):
-        return self.net(x)
-
-class PreNorm(nn.Module):
-    def __init__(self, dim, fn):
-        super().__init__()
-        self.norm = nn.LayerNorm(dim)
-        self.fn = fn
-    def forward(self, x, **kwargs):
-        return self.fn(self.norm(x), **kwargs)
-
-class FNetBlock(nn.Module):
-    def __init__(self):
-        super().__init__()
-
-    def forward(self, x):
-        x = torch.fft.fft(torch.fft.fft(x, dim=-1), dim=-2).real
-        return x
-
-class FNet(nn.Module):
-    def __init__(self, dim, depth, mlp_dim, dropout = 0.):
-        super().__init__()
-        self.layers = nn.ModuleList([])
-        for _ in range(depth):
-            self.layers.append(nn.ModuleList([
-                PreNorm(dim, FNetBlock()),
-                PreNorm(dim, FeedForward(dim, mlp_dim, dropout = dropout))
-            ]))
-    def forward(self, x):
-        for attn, ff in self.layers:
-            x = attn(x) + x
-            x = ff(x) + x
-        return x
-
 def InfoNCE(view1, view2, temperature=0.2):
     view1, view2 = F.normalize(view1, dim=1), F.normalize(view2, dim=1)
     pos_score = (view1 * view2).sum(dim=-1)
@@ -133,7 +89,6 @@ class MacridDAE8(CrossDomainRecommender, AutoEncoderMixin):
             encoder_layer=transformer_encoder,
             num_layers=1,
         )
-        self.fnet_layer = FNet(self.lat_dim, 1, self.lat_dim * 4, 0.5)
         self.projector = MLPLayers([self.lat_dim, self.lat_dim, self.lat_dim], activation='tanh')
         # parameters initialization
         self.apply(xavier_normal_initialization)
@@ -169,7 +124,8 @@ class MacridDAE8(CrossDomainRecommender, AutoEncoderMixin):
         if noise:
             random_noise = torch.rand_like(A_pha, device=self.device)
             A_pha += torch.sign(A_pha) * F.normalize(random_noise, dim=-1) * self.epsilon
-        A_hat = torch.fft.ifft(A_abs * (torch.e ** (1j * A_pha))).real.T
+        A_hat = A_abs * (torch.e ** (1j * A_pha))
+        A_hat = torch.fft.ifft(A_hat).real.T
         return A_hat
 
     def get_cates(self, cates_logits):
@@ -210,7 +166,6 @@ class MacridDAE8(CrossDomainRecommender, AutoEncoderMixin):
             self.h_list.append(z_k)
             logits_k = torch.matmul(z_k, items.transpose(0, 1)) / self.tau
             probs_k = torch.exp(logits_k)
-            # probs_k = probs_k * cates_k
             probs_k = probs_k
             probs = probs_k if (probs is None) else (probs + probs_k)
 

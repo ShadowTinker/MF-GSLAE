@@ -15,6 +15,7 @@ from recbole.utils import ensure_dir, get_local_time, early_stopping, calculate_
     EvaluatorType, KGDataLoaderState, get_tensorboard, set_color, get_gpu_usage, WandbLogger
 from recbole.data.dataloader import FullSortEvalDataLoader
 from collections import OrderedDict
+from torch.nn.utils.clip_grad import clip_grad_norm_
 
 class CrossDomainTrainer(Trainer):
     r"""Trainer for training cross-domain models. It contains four training mode: SOURCE, TARGET, BOTH, OVERLAP
@@ -39,6 +40,56 @@ class CrossDomainTrainer(Trainer):
         self.train_loss_dict = dict()
         self.epochs = int(self.train_epochs[phase])
         self.eval_step = min(self.config['eval_step'], self.epochs)
+
+    def _train_epoch(self, train_data, epoch_idx, loss_func=None, show_progress=False):
+        r"""Train the model in an epoch
+
+        Args:
+            train_data (DataLoader): The train data.
+            epoch_idx (int): The current epoch id.
+            loss_func (function): The loss function of :attr:`model`. If it is ``None``, the loss function will be
+                :attr:`self.model.calculate_loss`. Defaults to ``None``.
+            show_progress (bool): Show the progress of training epoch. Defaults to ``False``.
+
+        Returns:
+            float/tuple: The sum of loss returned by all batches in this epoch. If the loss in each batch contains
+            multiple parts and the model return these multiple parts loss instead of the sum of loss, it will return a
+            tuple which includes the sum of loss in each part.
+        """
+        self.model.train()
+        loss_func = loss_func or self.model.calculate_loss
+        total_loss = None
+        iter_data = (
+            tqdm(
+                train_data,
+                total=len(train_data),
+                ncols=100,
+                desc=set_color(f"Train {epoch_idx:>5}", 'pink'),
+            ) if show_progress else train_data
+        )
+        for batch_idx, interaction in enumerate(iter_data):
+            interaction = interaction.to(self.device)
+            self.optimizer.zero_grad()
+            losses = loss_func(interaction)
+            if isinstance(losses, tuple):
+                loss = sum(losses)
+                loss_tuple = tuple(per_loss.item() for per_loss in losses)
+                total_loss = loss_tuple if total_loss is None else tuple(map(sum, zip(total_loss, loss_tuple)))
+            else:
+                loss = losses
+                total_loss = losses.item() if total_loss is None else total_loss + losses.item()
+            self._check_nan(loss)
+            loss.backward()
+            # f = open('./debug.log', 'a+')
+            # f.write(str((self.model.mask_target.weight).clone().detach().cpu().tolist()) + '\n')
+            # f.write(str((self.model.mask_target.weight.grad).clone().detach().cpu().tolist()) + '\n\n')
+            # f.close()
+            if self.clip_grad_norm:
+                clip_grad_norm_(self.model.parameters(), **self.clip_grad_norm)
+            self.optimizer.step()
+            if self.gpu_available and show_progress:
+                iter_data.set_postfix_str(set_color('GPU RAM: ' + get_gpu_usage(self.device), 'yellow'))
+        return total_loss
 
     def fit(self, train_data, valid_data=None, verbose=True, saved=True, show_progress=False, callback_fn=None):
         r"""Train the model based on the train data and the valid data.

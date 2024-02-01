@@ -1,0 +1,14 @@
+{
+    "alpha": {
+        "_type": "choice",
+        "_value": [0, 0.9, 0.99, 0.999, 0.9999, 1]
+    },
+    "kfac": {
+        "_type": "choice",
+        "_value": [10]
+    },
+    "tau": {
+        "_type": "choice",
+        "_value": [0.1]
+    }
+}
